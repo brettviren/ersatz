@@ -1,0 +1,8 @@
+*~
+*.pyc
+__pycache__
+old
+test_*.png
+test_*.diag
+test_*.svg
+test_*.pdf
