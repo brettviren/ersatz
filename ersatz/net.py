@@ -15,6 +15,48 @@ def Message(src, dst, size, **kwds):
     keys = ['src','dst','size'] + list(kwds.keys())
     return namedtuple('Message',keys)(src=src, dst=dst, size=size, **kwds)
 
+class Pipeline(object):
+    '''A host process which runs a sequence of message processing functions.
+
+    The pipeline is a sequence of callables taking a message and a set
+    of keyword arguments and returning a new message.  Callables are
+    chained through these messages.
+
+    '''
+    def __init__(self, funcs, **kwds):
+        self.pipeline = funcs
+        pass
+    def __call__(self, rx, tx):
+        while True:
+            msg = yield rx.get()
+            print ('Pipeline got: %s' % str(msg))
+            for func in self.pipeline:
+                msg = func(msg)
+            print ('Pipeline put: %s' % str(msg))
+            yield tx.put(msg)
+
+class Sink(object):
+    '''A host which consumes messages via function returning nothing.
+    '''
+    def __init__(self, func, **kwds):
+        self.func = func
+        pass
+    def __call__(self, rx, tx):
+        while True:
+            msg = yield rx.get()
+            print ('Pipeline got: %s' % str(msg))
+            self.func(msg)
+            
+class Generator(object):
+    '''A host process that runs a function and sends returned messages to tx.'''
+    def __init__(self, func, **kwds):
+        self.func = func
+    def __call__(self, rx, tx):
+        while True:
+            if hasattr(self.func, 'prepare'):
+                yield self.func.prepare()
+            yield tx.put(self.func())
+
 class Host(object):
     def __init__(self, env, ident, proc=None, rx = None, tx=None):
         self.ident = ident
@@ -38,16 +80,27 @@ class Host(object):
         return self._rx.put(msg)
 
 
-def router(env, hosts, delay=0.0, bandwidth=None):
-    if type(hosts) is list:
-        remotes = {h.ident:h for h in hosts}
+def identdictify(things):
+    if type(things) is list:
+        return {t.ident:t for t in things}
+    return things
+
+def switch(env, hosts, delay=0.0, bandwidth=None):
+    "Full-duplex switching between hosts"
+
+    hosts = identdictify(hosts)
 
     def route(host):
         while True:
             with host.txlock() as txlock:
                 yield txlock
                 msg = yield host.get()
-                remote = remotes[msg.dst]
+                try:
+                    remote = hosts[msg.dst]
+                except KeyError:
+                    print('Unknown dest host "%s" from "%s".  Know: %s' %
+                          (msg.dst, msg.src, ', '.join([h.ident for h in hosts])))
+                    continue
                 with remote.rxlock() as rxlock:
                     yield rxlock
                     latency = delay
@@ -56,9 +109,37 @@ def router(env, hosts, delay=0.0, bandwidth=None):
                     yield env.timeout(latency)
                     yield remote.put(msg)
 
-    for h in hosts:
+    for h in hosts.values():
         env.process(route(h))
 
+
+def router(env, fromhosts, tohosts, delay=0.0, bandwidth=None):
+    "Route packets from fromhosts to tohosts"
+    fromhosts = identdictify(fromhosts)
+    tohosts = identdictify(tohosts)
+
+    def route(host):
+        while True:
+            with host.txlock() as txlock:
+                yield txlock
+                msg = yield host.get()
+                try:
+                    remote = tohosts[msg.dst]
+                except KeyError:
+                    print('Unknown dest host "%s" from "%s".  Know: %s' %
+                          (msg.dst, msg.src, ', '.join([h.ident for h in tohosts])))
+                    continue
+                with remote.rxlock() as rxlock:
+                    yield rxlock
+                    latency = delay
+                    if bandwidth:
+                        latency += msg.size/bandwidth
+                    yield env.timeout(latency)
+                    yield remote.put(msg)
+
+    for h in fromhosts.values():
+        env.process(route(h))
+        
 class Pipe(object):
     """
     A true fixed size store.

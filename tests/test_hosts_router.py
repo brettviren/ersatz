@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import simpy
-from ersatz.net import Message, Host, router
+from ersatz.net import Message, Host, switch
 from ersatz import units
 
 
@@ -71,7 +71,7 @@ def test_graph():
     h4 = Host(env, 'h4', proc=Chirp(env))
     h5 = Host(env, 'h5', proc=Chirp(env))
     all_hosts = [h1, h2, h3, h4, h5]
-    router(env, all_hosts)
+    switch(env, all_hosts)
 
     env.process(message_injector(env, h1))
 

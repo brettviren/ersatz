@@ -49,10 +49,9 @@ class layer(object):
         self.pipeline = listify(pipeline)
 
     def __call__(self, env, objstore):
+        pass
 
-        
 
-    return name
 
 
 import ersatz.functions
