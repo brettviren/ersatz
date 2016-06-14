@@ -12,6 +12,7 @@ setup(name = 'ersatz',
       packages = ['ersatz'],
 
       install_requires=[
+          "simpy",
           "click",
           "networkx",
       ],

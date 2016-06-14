@@ -40,6 +40,15 @@ class DetectorFragment(object):
         return msg
                        
 
+class Spy(object):
+    def __init__(self, env):
+        self.env = env
+
+    def rx(self, msg):
+        print ('RX (%.1f) %s' % (self.env.now, str(msg)))
+    def tx(self, msg):
+        print ('TX (%.1f) %s' % (self.env.now, str(msg)))
+
 def test_full():
 
     env = simpy.Environment()
