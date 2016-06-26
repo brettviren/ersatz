@@ -78,7 +78,7 @@ class Switch(object):
         '''
         while True:
             stream = yield self.inbox.get()
-            print ('accept with %d ongoing:  %s' % (len(self.streams), stream))
+            #print ('accept with %d ongoing:  %s' % (len(self.streams), stream))
             self.env.process(self.deliver(stream))
 
     def stage(self, stream):
@@ -176,7 +176,7 @@ class Switch(object):
             return None
         etas = [(s.eta,s) for s in streams]
         etas.sort()
-        print ('\n'.join(["%.1f: %s" % (t,s) for t,s in etas]))
+        #print ('\n'.join(["%.1f: %s" % (t,s) for t,s in etas]))
         return etas[0][1]
 
     def update(self, elapsed):
@@ -185,7 +185,7 @@ class Switch(object):
         '''
         for s in self.streams:
             s.update(elapsed)
-            print ('\tupdated: %s' % str(s))
+            #print ('\tupdated: %s' % str(s))
         return
 
     def deliver(self, stream):
@@ -195,30 +195,30 @@ class Switch(object):
         This preempts any delivery already in progress.
         '''
         prio = -1*len(self.streams)
-        print ('GRAB with priority %d' % prio)
+        #print ('GRAB with priority %d' % prio)
         with self.transmit.request(priority=prio) as req: # this prempts any existing delivery
             yield req
             self.stage(stream)
             self.balance()
             stream = self.find_next()
             start = self.env.now
-            print ('delivering t=%.1f prio=%d: %s' % (start, prio, stream))
+            #print ('delivering t=%.1f prio=%d: %s' % (start, prio, stream))
             try:
                 yield self.env.timeout(stream.eta)
             except simpy.Interrupt: # someone else came to deliver
-                print ('INTERUPTED %s' % str(stream))
+                #print ('INTERUPTED %s' % str(stream))
                 self.update(self.env.now-start)
                 return
 
             # reach here, successfully waited out a stream to finish
             elapsed = self.env.now - start
             self.update(elapsed)
-            print ('delivered after %.1f: %s' % (elapsed, stream))
+            #print ('delivered after %.1f: %s' % (elapsed, stream))
             self.unstage(stream)
             yield self.outbox.put(stream)
 
         stream = self.find_next()
-        print ('moving on to: %s' % stream)
+        #print ('moving on to: %s' % stream)
         if stream:
             self.env.process(self.deliver(stream))
 
