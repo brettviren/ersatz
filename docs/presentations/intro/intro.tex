@@ -1,0 +1,314 @@
+
+% TEXINPUTS=.:$HOME/git/bvtex: latexmk -pdf <main>.tex
+\documentclass[xcolor=dvipsnames]{beamer}
+
+\input{defaults} 
+\input{beamer/preamble}
+
+\setbeamertemplate{navigation symbols}{} %
+%\setbeamertemplate{background}[grid][step=1cm]
+
+\usepackage{siunitx} \usepackage{xmpmulti}
+\usepackage[export]{adjustbox}
+
+\usepackage[outline]{contour} \usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows} \usetikzlibrary{positioning}
+
+\definecolor{bvtitlecolor}{rgb}{0.98, 0.92, 0.84}
+\definecolor{bvoutline}{rgb}{0.1, 0.1, 0.1}
+
+\renewcommand{\bvtitleauthor}{Brett Viren}
+\renewcommand{\bvtit}{Ersatz}
+\renewcommand{\bvtitle}{\LARGE Ersatz\\\large A Discrete Event Simulation of\\Distributed Applications}
+\renewcommand{\bvevent}{protoDUNE DAQ Sim\\ \small 8 Jul 2016} 
+\renewcommand{\bvbeamerbackground}{}
+
+\begin{document} 
+
+\input{beamer/title.tex}
+%\input{beamer/toc.tex}
+
+\section{Caveat}
+
+\begin{frame}
+  \begin{center}
+    \textbf{\Huge CAVEAT AUDITORIUM}
+
+    \vspace{10mm}
+
+    This is still very much a work in progress.
+
+    \vspace{10mm}
+    Anyone interested in getting involved?  
+
+    You are very welcome!
+  \end{center}
+
+  \vfill
+
+  $\rightarrow$ for now, still heavy on the concepts, \\light on the results....
+\end{frame}
+
+\section{The Problem}
+
+\begin{frame}
+  \tableofcontents[currentsection,hideothersubsections]
+\end{frame}
+
+\begin{frame} 
+  \frametitle{protoDUNE/SP Data Scenarios}
+  \href{http://docs.dunescience.org:8080/cgi-bin/ShowDocument?docid=1086}{DUNE DocDB 1086-v6}
+  \begin{itemize}\footnotesize
+  \item Capture quantitative assumptions and implications and guide design.
+    \begin{itemize}\scriptsize
+    \item (Please let's maintain \textbf{one} source for this kind of info)
+    \end{itemize}
+  \item Recently revised (upward) by Tom Junk with help from FNAL Computing.
+  \item 25-50Hz, 5ms, 6APA, 2-4$\times$ compression, 25-50M events.
+  \item 25-50TB buffer disk, 30-60 parallel HDD writes, 1.5-3.0 GByte/sec.
+    \begin{itemize}  \scriptsize
+    \item Instantaneous - but taking just as many cosmics as beam between spills!
+    \end{itemize}
+  \item What processing, where?
+    \begin{itemize}  \scriptsize
+    \item Huffman encoding?  Initial software noise filtering?  Signal
+      processing (response deconvolution)?
+    \end{itemize}
+  \end{itemize}
+
+  \vfill
+
+  \footnotesize
+
+  To handle this data, I wonder: \textbf{what computing and networking
+  elements are needed, of what type, how many and how are they
+  interconnected?} 
+
+  \vfill
+
+  There is a relatively high level of complexity, the assumptions have
+  spanned at least an order of magnitude, and keep changing
+  $\Rightarrow$ need an efficient and quantitative way to explore the
+  configuration space.
+
+  \vfill
+  $\rightarrow$ Simulation!
+\end{frame}
+
+\section{The Conceptual Model}
+
+\begin{frame}
+  \tableofcontents[currentsection,hideothersubsections]
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Conceptual System Model}
+
+
+  \begin{columns}
+    \begin{column}{0.4\textwidth}
+      \includegraphics[width=\textwidth]{generic.pdf}      
+
+      \scriptsize 
+
+      Logically, the graph is made of fully-connected layers.
+
+      Physically, there are switch, NIC and computer constraints.
+
+    \end{column}
+    \begin{column}{0.6\textwidth}
+      Model joint online/offline context as \textit{directed acyclic graph} of
+      \textit{functional nodes} consuming, processing and producing \textit{discrete units of data}.
+
+      \vspace{2mm}
+
+      The scope of the model may include:
+      \begin{itemize}\footnotesize
+      \item Digital readout electronics,
+      \item DAQ elements (ie, artDAQ nodes),
+      \item Buffer storage units,
+      \item Prompt processing jobs for QA/QC/commissioning.
+      \item Networking, SA TA bus.
+      \item[$\rightarrow$] don't care about the actual content of data
+        or processing just data sizes, rates, processing time, etc.
+      \end{itemize}
+      
+    \end{column}
+  \end{columns}
+
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Data model} 
+
+  Datum\footnote{gcide v.0.48} \textit{a single piece of information; especially a
+    piece of information obtained by observation or experiment; --
+    used mostly in the plural.} -- Except here, it really is singular!
+
+  \begin{itemize}
+  \item A \textbf{unit of data is discrete}, no open ended streams.
+  \item Examples:
+    \begin{itemize}
+    \item A fragment of a readout from a Board Reader
+    \item A single readout from an Event Builder
+    \end{itemize}
+  \item A datum has effectively \textbf{just two numbers}:
+    \begin{enumerate}
+    \item a size in Bytes
+    \item an identifier.
+    \end{enumerate}
+  \item Lifetime: produced by one node, consumed by another.
+  \end{itemize}
+  \vspace{-10mm}
+  \begin{center}
+    \includegraphics[height=2cm]{prodcons.pdf}
+  \end{center}
+  \vspace{-10mm}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Node model}
+
+
+  \begin{center}
+  \vspace{-10mm}
+  \includegraphics[width=0.9\textwidth]{onenode.pdf}    
+  \vspace{-15mm}
+  \end{center}
+
+  Each node modeled as having:
+  \begin{itemize}\footnotesize
+  \item An \textbf{address}
+  \item \textbf{Input bandwidth} limit and datum \textbf{buffer depth}.
+  \item Per-datum \textbf{processing latency}.
+  \item Data \textbf{reduction/inflation} factor.
+  \item \textbf{Output bandwidth} limit and datum \textbf{buffer depth}.
+  \item A \textbf{routing strategy} for addressing output datum to a downstream node.
+  \end{itemize}
+
+  \footnotesize
+  Notes:
+  \begin{itemize}
+  \item Switch bandwidth still applies, but node doesn't ``care''.
+  \item One node is not (necessarily) equated with one computer host.
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Host model}
+  Model a computer box.
+  \begin{itemize}
+  \item May constrain one or more nodes.
+  \item Assert NIC RX/TX maximum bandwidth constraints.
+  \item Restrict number of node I/O buffers (aka RAM constraint).
+  \item Limit minimum processing time (aka CPU constraint).
+  \end{itemize}
+
+  
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Switch model}
+  Model a network switch:
+
+  \begin{itemize}
+  \item Full-duplex, infinite switch fabric bandwidth.
+  \item Bandwidth limited at both RX and TX ports  (eg, @ 1Gbps).
+  \item Shared bandwidth.
+    \begin{itemize}
+    \item Invented a simple, iterative load balancing algorithm.
+    \item Simultaneous transfers between shared TX and RX ports.
+    \item Each stream goes as fast as possible subject to fair-share.
+    \end{itemize}
+  \item Preemptive.
+    \begin{enumerate}
+    \item Newly initiated transfer interrupts switch.
+    \item In-progress transfers updated with the elapsed time.
+    \item New stream added and bandwidth load-balanced.
+    \item Continue until interrupted or next transfer completes.
+    \end{enumerate}
+  \end{itemize}
+
+  (This has been implemented and tested.)
+\end{frame}
+
+\begin{frame}
+  \frametitle{Discrete Event Simulation}
+
+  Basic idea:
+  \begin{itemize}
+  \item System state changes in \textbf{discrete steps}.
+  \item Changes occur based on an ``\textbf{event}''. 
+    \begin{itemize}
+    \item Most events in terms of a ``\textbf{timeout}'' primitive.
+    \item[$\rightarrow$] (``do this thing for 3 seconds'').
+    \end{itemize}
+  \item Change state by executing associated ``\textbf{event callbacks}''.
+  \end{itemize}
+
+  \vspace{5mm}
+
+  Example: transfer a datum on a network link:
+  \begin{enumerate}\footnotesize
+  \item Get available bandwidth and fixed latency for the link.
+  \item Get the size of the datum.
+  \item Set \textbf{timeout}(\texttt{now + latency + size/bandwidth}).
+  \item Raise event ``transfer complete'' and trigger associated callbacks.
+  \end{enumerate}
+
+  \vspace{5mm}
+  $\rightarrow$ tl;dr: focus on connecting detailed, local event callbacks
+  and let the system work out the overall complex behavior.
+
+\end{frame}
+
+\section{The Software}
+
+\begin{frame}
+  \tableofcontents[currentsection,hideothersubsections]
+\end{frame}
+
+\begin{frame}
+  \frametitle{Ersatz}
+
+  \begin{center}
+    \url{https://github.com/brettviren/ersatz}
+  \end{center}
+
+  \begin{itemize}
+  \item Based on \href{https://simpy.readthedocs.io/}{SimPy 3} and Python 3.
+    \begin{itemize}
+    \item Asynchronous co-routines but single-threaded.
+    \item Python generators and heavy use of \texttt{yield}.
+    \end{itemize}
+  \item \textbf{Ersatz} package provides now, (or will Real Soon Now):
+    \begin{itemize}
+    \item A shared bandwidth, preemptive network switch (done). 
+    \item Generic, parametrized node (started).
+    \item Graph description and layout (todo).
+    \item Configuration and command line interface (started).
+    \item State monitoring and visualization services (rudimentary).
+    \item Many unit tests and examples (already)
+    \item Documentation (lagging)
+    \end{itemize}
+  \end{itemize}
+  Developers welcome.  Users need to wait a bit.
+
+\end{frame}
+
+\begin{frame}
+  \begin{center}
+    Watch this space.
+  \end{center}
+\end{frame}
+
+\end{document}
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

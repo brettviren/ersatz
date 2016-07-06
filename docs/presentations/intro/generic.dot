@@ -1,0 +1,76 @@
+digraph generic {
+	color=white;
+	rankdir=LR
+	splines=line
+	node[style=solid,fixedsize=true,label="",color=black,shape=circle];
+	edge[color=gray];
+
+	subgraph cluster_elec {
+		ssp1[label="SSP1",pos="1,1"];
+		ssp2[label="SSP2",pos="1,2"];
+		tpc1[label="TPC1",pos="1,3"];
+		tpc2[label="TPC2",pos="1,4"];
+		label = "Digital\nElectronics";
+	}		
+
+	subgraph cluster_br {
+		sspbr1[label="SBR1",pos="2,1"];
+		sspbr2[label="SBR2",pos="2,2"];
+		tpcbr1[label="TBR1",pos="2,3"];
+		tpcbr2[label="TBR2",pos="2,4"];
+		brnet1[pos="2,5",style=invis,width=0];
+		label = "Board\nReaders";
+		{
+			rankdir=LR;
+			rank=same;
+			sspbr1->sspbr2->tpcbr1->tpcbr2[arrowhead=none,color=black,penwidth=2.0];
+		}
+	}
+
+	subgraph cluster_1 {
+		eb1[label="EB1",pos="3,1"]
+		eb2[label="...",pos="3,2"]
+		eb3[label="EBN",pos="3,3"]
+		eb0[style="invis"];
+		brnet2[pos="3,5!",shape=box,label="Network\nSwitch"];	
+
+		label = "Event\nBuilders";
+		{
+			rankdir=LR;
+			rank=same;
+			eb3->eb2->eb1[arrowhead=none,color=black,penwidth=2.0];
+		}
+	}
+	subgraph cluster_2 {
+		label="layer 3 (output layer)";
+	}
+
+	
+	tpcbr2->brnet1[arrowhead=none,color=black,penwidth=2.0,constraint=false];
+	brnet1->brnet2[arrowhead=none,color=black,penwidth=2.0];
+	eb3->brnet2[arrowhead=none,color=black,penwidth=2.0,constraint=false];
+
+	ssp1->sspbr1[color=black];
+	ssp2->sspbr2[color=black];
+	tpc1->tpcbr1[color=black];
+	tpc2->tpcbr2[color=black];
+
+
+	sspbr1->eb1[color="black",constraint=true];
+	sspbr1->eb2[color="red",constraint=false];
+	sspbr1->eb3[color="blue",constraint=false];
+
+	sspbr2->eb1[color="black",constraint=false];
+	sspbr2->eb2[color="red",constraint=true];
+	sspbr2->eb3[color="blue",constraint=false];
+
+	tpcbr1->eb1[color="black",constraint=false];
+	tpcbr1->eb2[color="red",constraint=true];
+	tpcbr1->eb3[color="blue",constraint=false];
+
+	tpcbr2->eb1[color="black",constraint=false];
+	tpcbr2->eb2[color="red",constraint=false];
+	tpcbr2->eb3[color="blue",constraint=true];
+
+	
+}

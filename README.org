@@ -1,27 +1,49 @@
-#+ TITLE: Ersatz 
+#+TITLE: Ersatz 
 
 * Concepts
 
-The Ersatz package allows simulating a distributed, networked application in terms of its throughput, latency and bottlenecks.  It abstracts this application into the following categories:
+The Ersatz package allows simulating a distributed, networked application (like DUNE's DAQ) in terms of its throughput, latency and bottlenecks.  It should be easy to explore a "configuration space" which spans the overall organization of the distributed application as well as detailed assumptions about the performance of individual elements.
 
-- network :: a group of routers.
-- router :: a switch which routes packets between hosts imposing fixed and bandwidth delays.
-- layer :: a set of hosts of a common type.
-- host :: an addressable pair of input (=rx=) and output (=tx=) network interfaces.
-- process :: marshals messages from the =rx=, through a pipeline of functions and to the =tx= of a host.
-- function :: an element of a process pipeline taking one input message and returning one output message.
-- message :: a unit of data with source and destination addresses (host names), a size and any number of keyword attributes.
+The application is modeled as an acyclic directed graph.  Each node is specified by:
 
-* Configuration
+- input and output bandwidth
+- input and output buffer depths
+- processing time
+- data compression/inflation factor
+- output routing 
 
-A simulation is assembled based on a configuration file.  The file is of the form of named sections of key/value pairs (INI format).  An instance of each category above is created through its section in the configuration file.  A configuration file section is named with two words.  The first is the category label from the above list and the second is an instance name.  An instance is created through a default /factory method/ or one may be provided with the =factor= configuration item.  It given as a Python "dotted" path (ie, =module.object=).
+The "data" passed through the application not detailed and consists mostly of:
 
-Each category has a number of specific keyword arguments which which may be set in its configuration section and will be given to the factory.  Any additional keyword arguments given in the configuration section are passed to the constructor of the instance by the factory.  Thus, factories are called with the arguments:
+- a size (in Bytes)
+- an identifier
 
-1. the SimPy environment object
-2. the instance name
-3. category-specific keyword arguments
-4. additional keyword arguments.
+These messages are produced and consumed between two nodes.  
+Routing of messages is subject to logical connections and constrained by a model of transport mechanism (eg a shared bandwidth, preemptive network switch).  
 
+* Installation
 
+Erastz is a Python 3 application and installs in the "normal Python way".  It is recommended to install inside a virtual environment
+
+#+BEGIN_EXAMPLE
+  $ virtualenv -p python3 ersatz-venv
+  $ source ersatz-venv/bin/activate
+
+  $ git clone https://github.com/brettviren/ersatz.git
+  $ cd ersatz/
+
+  $ python setup.py install
+
+  # or
+
+  $ python setup.py develop
+#+END_EXAMPLE
+
+* Running
+
+Right now, there is no command line interface, just a bunch of unit tests.  Some of which actually run.
+
+#+BEGIN_EXAMPLE
+$ python tests/test_shared_bandwidth_switch.py 
+... a bunch of text that is probably meaningless at first glance ...
+#+END_EXAMPLE
 

@@ -1,0 +1,22 @@
+digraph onenode {
+	rankdir=LR;
+	
+	subgraph cluster_node {
+		label="Node model";
+		
+		input[label="address",shape=cds];
+		onenode[shape=box,label="processing latency\nreduction/inflation"];
+		output[shape=octagon,label="route"];
+	}
+	node1[label="node",shape=box];
+	node2[label="node",shape=box];
+	node3[label="node",shape=box];
+	
+	input->onenode[label="input b/w\nbuffer depth"];
+
+	onenode->output[label="output b/w\nbuffer depth",dir=none];
+
+	output->node1;
+	output->node2;
+	output->node3;
+}

@@ -1,0 +1,11 @@
+digraph prodcons {
+	rankdir=LR;
+	a[shape=point,style=invis];
+	producer[label="Node A", shape=box];
+	consumer[label="Node B", shape=box];
+	b[shape=point,style=invis];
+	a->producer[label="dataum #1"];
+	producer->consumer[label="datum #2"];
+	consumer->b[label="dataum #3"];
+
+}
