@@ -56,23 +56,18 @@
 \end{frame}
 
 \begin{frame} 
-  \frametitle{protoDUNE/SP Data Scenarios}
-  \href{http://docs.dunescience.org:8080/cgi-bin/ShowDocument?docid=1086}{DUNE DocDB 1086-v6}
+  \frametitle{protoDUNE/SP Data Scenarios \href{http://docs.dunescience.org:8080/cgi-bin/ShowDocument?docid=1086}{DocDB 1086-v6}}
+  
   \begin{itemize}\footnotesize
   \item Capture quantitative assumptions and implications and guide design.
     \begin{itemize}\scriptsize
     \item (Please let's maintain \textbf{one} source for this kind of info)
     \end{itemize}
-  \item Recently revised (upward) by Tom Junk with help from FNAL Computing.
+  \item \textbf{Recently revised} (upward) by Tom Junk with help from FNAL Computing.
   \item 25-50Hz, 5ms, 6APA, 2-4$\times$ compression, 25-50M events.
   \item 25-50TB buffer disk, 30-60 parallel HDD writes, 1.5-3.0 GByte/sec.
     \begin{itemize}  \scriptsize
     \item Instantaneous - but taking just as many cosmics as beam between spills!
-    \end{itemize}
-  \item What processing, where?
-    \begin{itemize}  \scriptsize
-    \item Huffman encoding?  Initial software noise filtering?  Signal
-      processing (response deconvolution)?
     \end{itemize}
   \end{itemize}
 
@@ -117,9 +112,10 @@
 
     \end{column}
     \begin{column}{0.6\textwidth}
+      \footnotesize
       Model joint online/offline context as \textit{directed acyclic graph} of
       \textit{functional nodes} consuming, processing and producing \textit{discrete units of data}.
-
+      \normalsize
       \vspace{2mm}
 
       The scope of the model may include:
@@ -128,9 +124,9 @@
       \item DAQ elements (ie, artDAQ nodes),
       \item Buffer storage units,
       \item Prompt processing jobs for QA/QC/commissioning.
-      \item Networking, SA TA bus.
-      \item[$\rightarrow$] don't care about the actual content of data
-        or processing just data sizes, rates, processing time, etc.
+      \item Networking, SATA bus.
+      \item[$\rightarrow$] \textbf{don't care about the actual content} of the data
+        or its processing, just \textbf{data sizes, rates, processing time}, etc.
       \end{itemize}
       
     \end{column}
@@ -142,9 +138,13 @@
 \begin{frame}
   \frametitle{Data model} 
 
+  \footnotesize
   Datum\footnote{gcide v.0.48} \textit{a single piece of information; especially a
     piece of information obtained by observation or experiment; --
-    used mostly in the plural.} -- Except here, it really is singular!
+    used mostly in the plural.} 
+  \normalsize
+
+  Except here, it really is singular!
 
   \begin{itemize}
   \item A \textbf{unit of data is discrete}, no open ended streams.
@@ -198,15 +198,17 @@
 
 \begin{frame}
   \frametitle{Host model}
-  Model a computer box.
+  Model a computer box to constrain nodes.
   \begin{itemize}
-  \item May constrain one or more nodes.
   \item Assert NIC RX/TX maximum bandwidth constraints.
   \item Restrict number of node I/O buffers (aka RAM constraint).
   \item Limit minimum processing time (aka CPU constraint).
   \end{itemize}
 
-  
+  \vfill
+  \footnotesize
+
+  I've not thought enough about this particular element yet....
 
 \end{frame}
 
@@ -215,20 +217,20 @@
   Model a network switch:
 
   \begin{itemize}
-  \item Full-duplex, infinite switch fabric bandwidth.
   \item Bandwidth limited at both RX and TX ports  (eg, @ 1Gbps).
+  \item Full-duplex ports, assume infinite switch fabric bandwidth.
   \item Shared bandwidth.
     \begin{itemize}
     \item Invented a simple, iterative load balancing algorithm.
-    \item Simultaneous transfers between shared TX and RX ports.
+    \item Competing transfers between shared TX and RX ports.
     \item Each stream goes as fast as possible subject to fair-share.
     \end{itemize}
   \item Preemptive.
     \begin{enumerate}
-    \item Newly initiated transfer interrupts switch.
-    \item In-progress transfers updated with the elapsed time.
-    \item New stream added and bandwidth load-balanced.
-    \item Continue until interrupted or next transfer completes.
+    \item A new transfer interrupts the switch.
+    \item All in-progress transfers get their progress updated.
+    \item New stream added and overall bandwidth load-balanced.
+    \item Continue until interrupted or next pending transfer completes.
     \end{enumerate}
   \end{itemize}
 
@@ -240,11 +242,11 @@
 
   Basic idea:
   \begin{itemize}
-  \item System state changes in \textbf{discrete steps}.
+  \item Total system state changes in \textbf{discrete steps}.
   \item Changes occur based on an ``\textbf{event}''. 
     \begin{itemize}
-    \item Most events in terms of a ``\textbf{timeout}'' primitive.
-    \item[$\rightarrow$] (``do this thing for 3 seconds'').
+    \item Most events defined in terms of a ``\textbf{timeout}'' primitive.
+    \item[$\rightarrow$] eg: ``\textit{do this thing in 3 seconds from now}''
     \end{itemize}
   \item Change state by executing associated ``\textbf{event callbacks}''.
   \end{itemize}
@@ -253,8 +255,8 @@
 
   Example: transfer a datum on a network link:
   \begin{enumerate}\footnotesize
-  \item Get available bandwidth and fixed latency for the link.
-  \item Get the size of the datum.
+  \item Get available \textbf{bandwidth} and fixed \textbf{latency} for the link.
+  \item Get the \textbf{size} of the datum.
   \item Set \textbf{timeout}(\texttt{now + latency + size/bandwidth}).
   \item Raise event ``transfer complete'' and trigger associated callbacks.
   \end{enumerate}
@@ -284,7 +286,7 @@
     \item Asynchronous co-routines but single-threaded.
     \item Python generators and heavy use of \texttt{yield}.
     \end{itemize}
-  \item \textbf{Ersatz} package provides now, (or will Real Soon Now):
+  \item \textbf{Ersatz} package now provides, (or will, \textit{Real Soon Now}):
     \begin{itemize}
     \item A shared bandwidth, preemptive network switch (done). 
     \item Generic, parametrized node (started).
@@ -292,7 +294,7 @@
     \item Configuration and command line interface (started).
     \item State monitoring and visualization services (rudimentary).
     \item Many unit tests and examples (already)
-    \item Documentation (lagging)
+    \item Documentation (there, but lagging)
     \end{itemize}
   \end{itemize}
   Developers welcome.  Users need to wait a bit.
