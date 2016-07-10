@@ -6,44 +6,6 @@ Provides a model for a shared bandwidth switch.
 import simpy
 from collections import namedtuple, defaultdict
 
-class Stream(object):
-    def __init__(self, inport, outport, size, now=None, payload=None):
-        '''
-        Bookkeeping for each stream managed by a Switch.
-        '''
-        self.inport = inport
-        self.outport = outport
-        self.size = size
-        self.start = now
-        self.payload = payload        
-
-        self.remaining = size
-        self.bandwidth = 0
-
-    def update(self, elapsed):
-        '''
-        Update remaining assuming elapsed time since last update.
-        '''
-        self.remaining -= self.bandwidth*elapsed
-
-    @property
-    def eta(self):
-        '''
-        Return time to complete stream at current bandwidth.
-        '''
-        return self.remaining / self.bandwidth
-
-    def __lt__(self, other):
-        if self.remaining < other.remaining: return True
-        if self.size < other.size: return True
-        if self.start < other.start: return True
-        return id(self) < id(other)
-
-    def __str__(self):
-        return 'stream %s --> %s start at %d, remaining: %.1f/%.1f (%.2f%%) bw=%.1f' % \
-            (self.inport, self.outport, self.start, self.remaining, self.size,
-             100.0*self.remaining/self.size, self.bandwidth)
-
 class Switch(object):
     '''
     A shared bandwidth switch.
@@ -85,9 +47,9 @@ class Switch(object):
         '''
         Add a new stream to the switch.
         '''
-        inport = self.instream[stream.inport]
+        inport = self.instream[stream.txaddr]
         inport.add(stream)
-        outport = self.outstream[stream.outport]
+        outport = self.outstream[stream.rxaddr]
         outport.add(stream)
         # prime stream bandwidth
         stream.bandwidth = 2*self.bandwidth / (len(inport)+len(outport))
@@ -98,11 +60,11 @@ class Switch(object):
         Remove stream from switch.
         '''
         try:
-            self.instream[stream.inport].discard(stream)
+            self.instream[stream.txaddr].discard(stream)
         except KeyError:
             pass
         try:
-            self.outstream[stream.outport].discard(stream)
+            self.outstream[stream.rxaddr].discard(stream)
         except KeyError:
             pass
 
@@ -160,9 +122,10 @@ class Switch(object):
         Return state of switch as a GraphViz dot string.
         '''
         ret = ['digraph switch {','rankdir=LR;']
-        for port,streams in self.instream.items():
+        for txaddr, streams in self.instream.items():
             for s in streams:
-                ret.append('in%d -> out%d[label="%.1f"];' % (s.inport,s.outport,s.bandwidth))
+                ret.append('%s -> %s[label="%.1f"];' %
+                           (s.txaddr, s.rxaddr, s.bandwidth))
         ret.append('}')
         return '\n'.join(ret)
         
@@ -220,6 +183,58 @@ class Switch(object):
         stream = self.find_next()
         #print ('moving on to: %s' % stream)
         if stream:
+            self.env.process(self.deliver(stream))
+
+        
+
+class LinkedSwitch(Switch):
+    '''
+    A Switch which manages linked NICs.
+
+    NICs provide and accept Stream objects.  Linking a NIC to a
+    LinkedSwitch will cause any streams that appear in the NIC's
+    outbox to be delivered and any delivered streams with the NIC's
+    address to be put in the NIC's inbox.
+    '''
+    def __init__(self, env, *args, **kwds):
+        super().__init__(env, *args, **kwds)
+        if env:
+            env.process(self.link_put())
+        self.link_rx = dict()
+
+    def link_nic(self, rxaddr, rx, tx):
+        '''
+        Link a NIC.
+
+        @param rxaddr: the (receive) address of NIC.
+        @param rx: a store to place received streams.
+        @param tx: a store from which to draw new streams.
+        '''
+        if None not in (rx,rxaddr):
+            self.link_rx[rxaddr] = rx
+        if None not in (tx,):
+            self.env.process(self.link_get(tx))
+
+    def link_put(self):
+        '''
+        A process to put completed streams to their addressed NIC
+
+        This is an internal method.
+        '''
+        while True:
+            stream = yield self.outbox.get()
+            nic_rx = self.link_rx[stream.rxaddr]
+            nic_rx.put(stream)
+            
+
+    def link_get(self, nic_tx):
+        '''
+        A process to get new streams from a NIC.
+
+        This is an internal network.
+        '''
+        while True:
+            stream = yield nic_tx.get()
             self.env.process(self.deliver(stream))
 
         
