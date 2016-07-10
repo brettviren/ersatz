@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
 '''
+A datum (singular) is an atomic unit of data which exists between a
+producer/transmitter and a consumer/receiver.  
 '''
 
-class Stream(object):
+class Datum(object):
     '''
-    A stream represents the transfer of one datum across some link.
+    A Datum object holds ersatz system bookkeeping for transmitting a
+    payload between two endpoints.
     '''
-    def __init__(self, txaddr, rxaddr, size, now=None, payload=None):
+    def __init__(self, txaddr, rxaddr, size, payload=None):
         '''
-        Create a stream.
+        Create a datum.
 
-        @param txaddr: address of the transmitter of the stream.
+        @param txaddr: address of the transmitter of the datum.
         @type txaddr: hashable
 
-        @param rxaddr: address of the receiver of the stream.
+        @param rxaddr: address of the receiver of the datum.
         @type rxaddr: hashable
 
-        @param size: size of the transfer
+        @param size: size of the datum used to determine bandwidth
+            related transmission delay.
         @type size: number
 
-        @param now: the time the stream was initiated
-        @type now: number
-
-        @param payload: the semantic contents of the stream
+        @param payload: the semantic contents of the datum
         @type payload: opaque
         '''
         self.txaddr = txaddr
         self.rxaddr = rxaddr
         self.size = size
-        self.start = now
         self.payload = payload        
 
         self.remaining = size
@@ -43,18 +43,17 @@ class Stream(object):
     @property
     def eta(self):
         '''
-        Return time to complete stream at current bandwidth.
+        Return time to complete transfer of the datum at current bandwidth.
         '''
         return self.remaining / self.bandwidth
 
     def __lt__(self, other):
         if self.remaining < other.remaining: return True
         if self.size < other.size: return True
-        if self.start < other.start: return True
         return id(self) < id(other)
 
     def __str__(self):
-        return 'stream %s --> %s start at %d, remaining: %.1f/%.1f (%.2f%%) bw=%.1f' % \
-            (self.txaddr, self.rxaddr, self.start, self.remaining, self.size,
+        return 'datum %s --> %s remaining: %.1f/%.1f (%.2f%%) bw=%.1f' % \
+            (self.txaddr, self.rxaddr, self.remaining, self.size,
              100.0*self.remaining/self.size, self.bandwidth)
 

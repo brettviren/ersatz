@@ -1,81 +1,66 @@
+#!/usr/bin/env python3
+'''
+Test ersatz.node
+'''
+
 import simpy
-from ersatz import units
-from ersatz.net import Message
+from ersatz.datum import Datum
+from ersatz.node import Node
 
-class ExclusiveQueue(object):
-    def __init__(self, env, ident):
-        self.env = env
-        self.ident = ident
-        self.lock = simpy.Resource(env, 1)
-        self.queue = simpy.Store(env)
+def parse_address(addr):
+    name,number = addr.rsplit('.',1)
+    return name,int(number)
 
-    def put(self, msg):
-        return self.env.process(self._put(msg))
+def form_address(name, number):
+    return "%s.%d" % (name, number)
 
-    def _put(self, msg):
-        with self.lock.request() as req:
-            yield req
-            self.env.timeout(1)
-            print ('%s: t=%.1f putting %s' % (self.ident, self.env.now, msg))
-            self.queue.put(msg)
-            self.env.timeout(1)
+class Splitter(object):
+    def __init__(self, latency, rate, number=2):
+        self.latency = latency
+        self.rate = rate
+        self.number = number
 
+    def __call__(self, datum):
+        ouraddr = datum.rxaddr
+        name,number = parse_address(ouraddr)
+        theiraddr = form_address(name, number+1), 
+        target_size = datum.size/number
 
+        delay = target_size/self.rate
+        payload = datum.payload
+        step = int(len(payload) / self.number)
 
-class Node(object):
-    def __init__(self, env, ident):
-        self.env = env
-        self.ident = ident
+        for count in range(self.number):
+            de = self.latency + (count+1)*delay
+            pl = payload[step*count:step*(count+1)]
+            da = Datum(ouraddr, theiraddr, target_size, pl)
+            yield de,da
+    
 
-        self.in_queue = ExclusiveQueue(env,"i"+ident[-1])
-        self.out_queue = ExclusiveQueue(env,"o"+ident[-1])
+def chirp(datum):
+    print ("datum: %s" % datum)
+    return
 
-        env.process(self.run())
-
-    def run(self):
-        while True:
-            msg = yield self.in_queue.queue.get()
-            yield self.env.timeout(2*units.second)
-            print ('%s: t=%.1f processing %s' % (self.ident, self.env.now, msg))
-            self.out_queue.queue.put(msg)
-
-
-    # def put(self, msg):
-    #     with self.write_lock.request() as req:
-    #         yield req
-    #         print ('putting %s' % msg)
-    #         self.in_queue.put(msg)
-
-    # def get(self):
-    #     with self.read_lock.request() as req:
-    #         yield req
-    #         return self.out_queue.get()
-
-
-def sender(env, node, me):
-    for count in range(5):
-        yield env.timeout(units.second)
-        msg = Message(None, None, units.GB, sent=env.now, count=count)
-        print ('%s: t=%.1f sending %s' % (me, env.now, msg))
-        #node.in_queue.put(msg)
-        node.in_queue.put(msg)
-
-def receiver(env, node, me):
+def shunt(env, n1, n2, bandwidth, latency=0.0):
     while True:
-        with node.out_queue.lock.request():
-            msg = yield node.out_queue.queue.get()
-            print ('%s: t=%.1f got %s' % (me, env.now, msg))
+        d = yield n1.tx.get()
+        d.bandwidth = bandwidth # get whole thing
+        wait = d.eta
+        yield env.timeout(wait + latency)
+        d.update(wait)          # it's a function of switch, not datum
+        print ("shunted: t=%.1f %s" % (env.now, d))
+        yield n2.rx.put(d)
 
-def test_sender_receiver():
-
+def test_simple():
     env = simpy.Environment()
-    node = Node(env, "n1")
-    env.process(sender(env, node, "s1"))
-    env.process(sender(env, node, "s2"))
-    env.process(receiver(env, node, "r1"))
-    SIM_DURATION = 100
-    env.run(until=SIM_DURATION)
+
+    n1 = Node(env, Splitter(10, 100))
+    n2 = Node(env, chirp)
+    env.process(shunt(env, n1, n2, 10))
+
+    n1.rx.put(Datum("node.1", "node.2", 1000, payload=range(10)))
+    env.run(until=200)
 
 if '__main__' == __name__:
-    test_sender_receiver()
+    test_simple()
     

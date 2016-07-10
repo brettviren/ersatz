@@ -2,14 +2,14 @@
 
 import simpy
 from ersatz.switch import Switch, LinkedSwitch
-from ersatz.stream import Stream
+from ersatz.datum import Datum
 from ersatz.monitoring import trace
 
 def test_balance():
     sw = Switch(None, 100)
     for ip in range(5):
         for op in range(max(0,ip-2),min(5,ip+2)):
-            sw.stage(Stream(ip, op, 10))
+            sw.stage(Datum(ip, op, 10, None))
     
     imb,count = sw.balance()
     print ('%d iters: max adj: %.1f' % (count, imb))
@@ -22,18 +22,17 @@ def test_balance():
 
 def slurp(env, outbox):
     while True:
-        stream = yield outbox.get()
-        print ('final: %s' % stream)
-        dt = env.now-stream.start
-        print ('\tDONE: at %.1f took %.1f avg bandwidth=%f %s' % \
-               (env.now, dt, stream.size/dt, stream.payload))
-        print('\t    : %s -> %s' % (stream.txaddr, stream.rxaddr))
+        datum = yield outbox.get()
+        print ('final: %s' % datum)
+        print ('\tDONE: at %.1f, %s' % \
+               (env.now, datum.payload))
+        print('\t    : %s -> %s' % (datum.txaddr, datum.rxaddr))
 
 def add_stream(env, inbox, wait, txaddr, rxaddr, size, payload):
-    print ('waiting %f to start stream "%s"' % (wait, payload))
+    print ('waiting %f to start stream of "%s"' % (wait, payload))
     yield env.timeout(wait)
-    print ('starting stream "%s"' % payload)
-    yield inbox.put(Stream(txaddr, rxaddr, size, env.now, payload))
+    print ('starting stream with payload "%s"' % payload)
+    yield inbox.put(Datum(txaddr, rxaddr, size, payload))
 
 class FillData(object):
     def __init__(self):
@@ -49,9 +48,9 @@ def test_switching():
 
     sw = Switch(env, 10)
     env.process(slurp(env, sw.outbox))
-    env.process(add_stream(env, sw.inbox, 0, 'p1', 'p2', 50, "stream1"))
-    env.process(add_stream(env, sw.inbox, 2, 'p1', 'p3', 50, "stream2"))
-    env.process(add_stream(env, sw.inbox, 4, 'p2', 'p3', 50, "stream3"))
+    env.process(add_stream(env, sw.inbox, 0, 'p1', 'p2', 50, "datum1"))
+    env.process(add_stream(env, sw.inbox, 2, 'p1', 'p3', 50, "datum2"))
+    env.process(add_stream(env, sw.inbox, 4, 'p2', 'p3', 50, "datum3"))
 
     env.run(until=200)
     
