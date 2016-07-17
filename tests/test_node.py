@@ -42,6 +42,9 @@ def chirp(datum):
     return
 
 def shunt(env, n1, n2, bandwidth, latency=0.0):
+    '''
+    A fake switch.
+    '''
     while True:
         d = yield n1.tx.get()
         d.bandwidth = bandwidth # get whole thing
@@ -56,6 +59,8 @@ def test_simple():
 
     n1 = Node(env, Splitter(10, 100))
     n2 = Node(env, chirp)
+
+    # fake a switch
     env.process(shunt(env, n1, n2, 10))
 
     n1.rx.put(Datum("node.1", "node.2", 1000, payload=range(10)))
