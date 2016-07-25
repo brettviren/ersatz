@@ -29,6 +29,10 @@ class Node(object):
         self.env.process(self.run())
 
         
+    def output(self, delay, datum):
+        yield self.env.timeout(delay)
+        yield self.tx.put(datum)
+
     def run(self):
         '''
         Get rx datum, transform, apply delay and put any tx datum.
@@ -40,7 +44,4 @@ class Node(object):
                 continue
             for delay, datum in dd:
                 #print ('node: delay=%.1f datum=%s' % (delay, datum))
-                yield self.env.timeout(delay)
-                yield self.tx.put(datum)
-                
-                
+                self.env.process(self.output(delay, datum))
