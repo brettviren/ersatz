@@ -24,7 +24,7 @@ class BoardReader(object):
         pl = datum.payload
         ebaddr = self.router(pl)
         da = Datum(ouraddr, ebaddr, datum.size, pl)
-        print ("BR send: %s" % da)
+        #print ("BR send: %s" % da)
         return [(self.delay,da)]
 
 Event = namedtuple("Event", "trigger fragments")
@@ -43,7 +43,7 @@ class EventBuilder(object):
         ouraddr = datum.rxaddr
         nam,num = parse_address(ouraddr)
 
-        print ("EB recv: %s" % datum)
+        #print ("EB recv: %s" % datum)
 
         pl = datum.payload
         self.events[pl.trigger].append(datum)
@@ -55,17 +55,17 @@ class EventBuilder(object):
 
         ready = {t:l for t,l in self.events.items() if len(l) == self.nfragments}
 
-
         ret = list()
         for t,l in ready.items():
             self.events.pop(t)
             size = sum([d.size for d in l])
             payload = Event(fragments = [d.payload for d in l],
-                            trigger = l[0].trigger)
+                            trigger = l[0].payload.trigger)
             addr = self.router(payload)
-            print ("EB %s: trig: #%d at %.02fs" % (ouraddr, t, l[0].trigtime))
+            #print ("EB %s: trig: #%d at %.02fs" % (ouraddr, t, l[0].payload.trigtime))
             dd = self.delay, Datum(ouraddr, addr, size, payload)
-            ret.append(ret)
+            ret.append(dd)
+
         return ret
         
 
@@ -88,15 +88,24 @@ def fragment_source(env, trig, fragnum, size, brrx):
                    make_address('br', fragnum), # of one-to-one fr-br
                    size,
                    Fragment(trignum, fragnum, env.now))
+        if fragnum == 0:
+            print ("trigger %d at %.1f" % (trignum, env.now))
         trignum += 1
         yield brrx.put(da)
         
+def event_sink(env, rx):
+    while True:
+        da = yield rx.get()
+        pl = da.payload
+
+        print ("SINK: trig %d @%.1f from %s with %d fragments" % (pl.trigger, env.now, da.txaddr, len(pl.fragments)))
         
 def test_daq():
     env = simpy.Environment()
 
     fragment_size = 2.5*MB
-    trigger_period = (1.0/25.0)*second
+    #trigger_period = (1.0/25.0)*second
+    trigger_period = 1.0*second
     nboardreaders = 100
     neventbuilders = 20
     neventsperfile = 50
@@ -105,7 +114,10 @@ def test_daq():
         return trigger_period
 
     def br_router(pl):
-        ebnum = pl.trigger // neventsperfile % neventbuilders
+        ## if we keep sequential triggers into the EBs:
+        #ebnum = pl.trigger // neventsperfile % neventbuilders
+        ## if we round robbin at the trigger level
+        ebnum = pl.trigger % neventbuilders
         return make_address("eb",ebnum)
 
     def eb_router(pl):
@@ -137,8 +149,11 @@ def test_daq():
     for count, node in enumerate(layer_boardreaders):
         env.process(fragment_source(env, constant_trigger, count, fragment_size, node.rx))
 
+    sinkrx = simpy.Store(env)
+    lsw.link_nic("sink", sinkrx, None)
+    env.process(event_sink(env, sinkrx))
 
-    env.run(until=20)
+    env.run(until=100)
 
 if '__main__' == __name__:
     test_daq()

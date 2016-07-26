@@ -10,7 +10,7 @@ class Datum(object):
     payload between two endpoints.
     '''
 
-    eps = 1.0e-9
+    epsilon = 1.0e-9
 
     def __init__(self, txaddr, rxaddr, size, payload=None):
         '''
@@ -44,17 +44,27 @@ class Datum(object):
         self.remaining -= self.bandwidth*elapsed
 
     @property
+    def done(self):
+        if self.bandwidth == 0.0:
+            return False
+        if self.eta > 0.0:
+            return False
+        return True
+
+    @property
     def eta(self):
         '''
         Return time to complete transfer of the datum at current bandwidth.
         '''
+        if self.remaining == 0:
+            return 0.0
         try:
             t = self.remaining / self.bandwidth
         except ZeroDivisionError:
             print ("zero bandwidth: %s -> %s size=%f remaining=%f" % (self.txaddr, self.rxaddr, self.size, self.remaining))
             raise
-        if t<0 and t > -self.eps:
-            t = 0;
+        if abs(t) < self.epsilon:
+            return 0.0
         return t
 
     def __lt__(self, other):

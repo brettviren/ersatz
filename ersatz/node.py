@@ -44,4 +44,6 @@ class Node(object):
                 continue
             for delay, datum in dd:
                 #print ('node: delay=%.1f datum=%s' % (delay, datum))
-                self.env.process(self.output(delay, datum))
+                #self.env.process(self.output(delay, datum))
+                yield self.env.timeout(delay)
+                yield self.tx.put(datum)

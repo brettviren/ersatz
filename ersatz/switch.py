@@ -20,6 +20,8 @@ class Switch(object):
         self.instream = defaultdict(set)
         self.outstream = defaultdict(set)
 
+        self.waiting=set()
+
         if env:
             self.inbox = simpy.Store(env) # streams start
             self.outbox = simpy.Store(env) # streams finish
@@ -78,7 +80,6 @@ class Switch(object):
                 continue
             totbw = sum([s.bandwidth for s in streams])
             relbw = (totbw - self.bandwidth)/totbw
-            #print ('%6.2f'%relbw) 
             for s in streams:
                 adj = relbw*s.bandwidth
                 s.bandwidth -= adj
@@ -139,8 +140,13 @@ class Switch(object):
             return None
         etas = [(s.eta,s) for s in streams if s.bandwidth]
         etas.sort()
-        #print ('\n'.join(["%.1f: %s" % (t,s) for t,s in etas]))
         return etas[0][1]
+
+    def find_done(self):
+        '''
+        Return all completed streams
+        '''
+        return [s for s in self.streams if s.done]
 
     def update(self, elapsed):
         '''
@@ -148,7 +154,6 @@ class Switch(object):
         '''
         for s in self.streams:
             s.update(elapsed)
-            #print ('\tupdated: %s' % str(s))
         return
 
     def deliver(self, stream):
@@ -158,30 +163,38 @@ class Switch(object):
         This preempts any delivery already in progress.
         '''
         prio = -1*len(self.streams)
-        print ('GRAB with priority %d at t=%.02f' % (prio, self.env.now))
+        self.waiting.add(stream)
         with self.transmit.request(priority=prio) as req: # this prempts any existing delivery
             yield req
-            self.stage(stream)
+
+            for stream in self.waiting:
+                self.stage(stream)
+            self.waiting=set()
+
             self.balance()
+
             stream = self.find_next()
+            if not stream:
+                return
+
             start = self.env.now
-            print ('delivering t=%.2f prio=%d: %s [%d queued]' % (start, prio, stream, len(self.inbox.items)))
             try:
                 yield self.env.timeout(stream.eta)
             except simpy.Interrupt: # someone else came to deliver
-                print ('INTERUPTED %s' % str(stream))
                 self.update(self.env.now-start)
+                for stream in self.find_done():
+                    self.unstage(stream)
+                    yield self.outbox.put(stream)
                 return
 
             # reach here, successfully waited out a stream to finish
             elapsed = self.env.now - start
             self.update(elapsed)
-            print ('delivered after %.1f: %s' % (elapsed, stream))
-            self.unstage(stream)
-            yield self.outbox.put(stream)
+            for stream in self.find_done():
+                self.unstage(stream)
+                yield self.outbox.put(stream)
 
         stream = self.find_next()
-        print ('moving on to: %s' % stream)
         if stream:
             self.env.process(self.deliver(stream))
 
