@@ -73,7 +73,7 @@ class Datum(object):
         return id(self) < id(other)
 
     def __str__(self):
-        return 'datum %s --> %s remaining: %.1f/%.1f (%.2f%%) bw=%.1f pl=%s' % \
+        return 'datum %s --> %s remaining: %.1f/%.1f (%.2f%%) bw=%.1f pl type=%s' % \
             (self.txaddr, self.rxaddr, self.remaining, self.size,
-             100.0*self.remaining/self.size, self.bandwidth, self.payload)
+             100.0*self.remaining/self.size, self.bandwidth, type(self.payload))
 

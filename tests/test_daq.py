@@ -77,12 +77,17 @@ class Fragment(object):
     def __str__(self):
         return "trig=%003d frag=%003d t=%.02f" % (self.trigger, self.fragnum, self.trigtime)
 
-def fragment_source(env, trig, fragnum, size, brrx):
+def fragment_source(env, trig, fragnum, size, brrx, ntriggers=100):
     '''
     Be both fragment generator and deliverer
     '''
     trignum = 0
-    while True:
+
+    keep_going = lambda : True
+    if ntriggers:
+        keep_going = lambda: trignum < ntriggers
+
+    while keep_going():
         yield env.timeout(trig())
         da = Datum(make_address('fr', fragnum), # hard code routing policy
                    make_address('br', fragnum), # of one-to-one fr-br
@@ -147,13 +152,13 @@ def test_daq():
 
 
     for count, node in enumerate(layer_boardreaders):
-        env.process(fragment_source(env, constant_trigger, count, fragment_size, node.rx))
+        env.process(fragment_source(env, constant_trigger, count, fragment_size, node.rx, ntriggers=33))
 
     sinkrx = simpy.Store(env)
     lsw.link_nic("sink", sinkrx, None)
     env.process(event_sink(env, sinkrx))
 
-    env.run(until=100)
+    env.run(until=200)
 
 if '__main__' == __name__:
     test_daq()
