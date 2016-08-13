@@ -1,46 +1,46 @@
 #!/usr/bin/env python3
 '''
-
-Primitive functionality in which a single process in the ersatz graph is run.
-
+An ersatz node groups together an input message queue, a message
+processing service and a collection of output queues (which are the
+input queues of other nodes).
 '''
-import simpy
 
+import simpy
 class Node(object):
     '''
-    A Node mediates receiving and transmitting streams of data by
-    applying a datum transform function.
+    A node manages the execution of a number of service instances on a
+    queue of inputs.
     '''
-
-    def __init__(self, env, transform):
+    def __init__(self, env, queue, service, outs=None, nservices=1, **service_kwds):
         '''
-        Create a node.
+        Create a Node.
 
-        @param env: the simpy environment
-
-        @param transform: a function called on each input datum
-            returning a collection of output datum.
-        @type transform: calable(datum, now) -> [datum,...]
+        @param env: a simpy Environment
+        @param queue: a simpy Store
+        @param service: a generator yielding simpy events, taking a packet and a list of queues.
+        @param outs: an ordered dictionary of queues.
+        @param nservices: the number of concurrent services that may be active.
         '''
-        self.transform = transform
-        self.rx = simpy.Store(env)
-        self.tx = simpy.Store(env)
         self.env = env
-        self.env.process(self.run())
+        self.queue = queue
+        self.service = service
+        self.service_kwds = service_kwds
+        self.service_lock = simpy.Resource(env, nservices)
+        self.outs = outs or list()
+        self.action = self.env.process(self.run())
 
-        
     def run(self):
-        '''
-        Get rx datum, transform, apply delay and put any tx datum.
-        '''
         while True:
-            datum = yield self.rx.get()
-            dd  = self.transform(datum)
-            if not dd:
-                continue
-            for delay, datum in dd:
-                #print ('node: delay=%.1f datum=%s' % (delay, datum))
-                yield self.env.timeout(delay)
-                yield self.tx.put(datum)
-                
-                
+            req = self.service_lock.request()
+            yield req
+            packet = None
+            if self.queue:
+                packet = yield self.queue.get()
+            self.env.process(self.call_service(req, packet))
+
+    def call_service(self, req, packet):
+        for evt in self.service(self.env, packet, self.outs, **self.service_kwds):
+            yield evt
+        self.service_lock.release(req)
+
+
