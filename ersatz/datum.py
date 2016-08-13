@@ -9,6 +9,9 @@ class Datum(object):
     A Datum object holds ersatz system bookkeeping for transmitting a
     payload between two endpoints.
     '''
+
+    epsilon = 1.0e-9
+
     def __init__(self, txaddr, rxaddr, size, payload=None):
         '''
         Create a datum.
@@ -41,11 +44,28 @@ class Datum(object):
         self.remaining -= self.bandwidth*elapsed
 
     @property
+    def done(self):
+        if self.bandwidth == 0.0:
+            return False
+        if self.eta > 0.0:
+            return False
+        return True
+
+    @property
     def eta(self):
         '''
         Return time to complete transfer of the datum at current bandwidth.
         '''
-        return self.remaining / self.bandwidth
+        if self.remaining == 0:
+            return 0.0
+        try:
+            t = self.remaining / self.bandwidth
+        except ZeroDivisionError:
+            print ("zero bandwidth: %s -> %s size=%f remaining=%f" % (self.txaddr, self.rxaddr, self.size, self.remaining))
+            raise
+        if abs(t) < self.epsilon:
+            return 0.0
+        return t
 
     def __lt__(self, other):
         if self.remaining < other.remaining: return True
@@ -53,7 +73,7 @@ class Datum(object):
         return id(self) < id(other)
 
     def __str__(self):
-        return 'datum %s --> %s remaining: %.1f/%.1f (%.2f%%) bw=%.1f' % \
+        return 'datum %s --> %s remaining: %.1f/%.1f (%.2f%%) bw=%.1f pl type=%s' % \
             (self.txaddr, self.rxaddr, self.remaining, self.size,
-             100.0*self.remaining/self.size, self.bandwidth)
+             100.0*self.remaining/self.size, self.bandwidth, type(self.payload))
 
