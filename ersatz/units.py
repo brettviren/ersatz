@@ -15,11 +15,11 @@ B=8*bit
 Byte=B
 kB=1e3*Byte
 MB=1e6*Byte
+Gbit=1e9*bit
 
 # data rate
 baud=bit/second
 GB=1e9*Byte
-Gbit=1e9*bit
 Gbps=1e9*baud
 
 # rate

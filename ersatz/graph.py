@@ -22,7 +22,6 @@ All other node attributes passed to the service as keyword arguments on instanti
 '''
 
 import simpy
-import networkx as nx
 import importlib
 import ersatz.node
 
@@ -48,6 +47,8 @@ def objectify(env, spec):
             modname, methname = service.rsplit('.',1)
             mod = importlib.import_module(modname)
             service = getattr(mod, methname)
+            if type(service) == type: # a class
+                service = service(**attrs)
         args[node] = (queue, service, attrs)
 
     ret = dict()

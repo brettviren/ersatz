@@ -2,40 +2,62 @@
 
 import networkx as nx
 import ersatz.graph
+from ersatz.units import Gbps, ms, MB
 import simpy
+import matplotlib.pyplot as plt
 
-def generator(env, packet, outs, delay=1, **kwds):
-    count = 0
-    while True:
-        print ("generate: %d for %d" % (count, len(outs)))
+def generator(env, packet, outs, number=10, ndsts=2, delay=1, size=1*MB, **kwds):
+
+    for count in range(number):
+        idst = (count%ndsts) + 1
+        dst = "rxlink%d" % idst
+        print ("%.2f generate: %d for %s" % (env.now, count, dst))
         for out in outs.values():
-            yield out.put(count)
+            yield out.put(dict(size=size, count=count, dst=dst))
         yield env.timeout(delay)
-        count += 1
 
-def delay(env, packet, outs, timeout=1, **kwds):
-    yield env.timeout(timeout)
-    for out in outs.values():
-        yield out.put(packet)
 
-def sink(env, packet, outs, **kwds):
-    print ("sink: %s" % packet)
-    yield env.timeout(0.0)
+def sink(env, packet, outs, delay=1000*ms, **kwds):
+    yield env.timeout(delay)
+    print ("%.2f sink: %d %s (delay=%.1f)" % (env.now, packet['count'], packet['dst'], delay))
+
 
 def test_graph():
     g = nx.DiGraph()
-    g.add_node("source", service=generator, capacity=0)
-    g.add_node("delay", service=delay)
-    g.add_node("sink", service=sink)
 
-    g.add_edge("source","delay")
-    g.add_edge("delay","sink")
+    bandwidth = 1*Gbps
+
+    g.add_node("source", service=generator, number=10, capacity=0, size=100*MB)
+    g.add_node("tx", service='ersatz.service.tx', fragment_size=10*MB)
+    g.add_node("txlink", service='ersatz.service.link', bandwidth=bandwidth)
+    g.add_node("switch", service='ersatz.service.switch')
+    g.add_node("rxlink1", service='ersatz.service.link', bandwidth=bandwidth)
+    g.add_node("rxlink2", service='ersatz.service.link', bandwidth=bandwidth)
+    g.add_node("rx1", service='ersatz.service.rx')
+    g.add_node("rx2", service='ersatz.service.rx')
+    g.add_node("sink1", service=sink, delay=1000*ms)
+    g.add_node("sink2", service=sink, delay=10000*ms)
+
+
+    g.add_edge("source", "tx")
+    g.add_edge("tx", "txlink")
+    g.add_edge("txlink", "switch")
+    g.add_edge("switch", "rxlink1")
+    g.add_edge("switch", "rxlink2")
+    g.add_edge("rxlink1","rx1")
+    g.add_edge("rxlink2","rx2")
+    g.add_edge("rx1","sink1")
+    g.add_edge("rx2","sink2")
+
+    
+    nx.drawing.nx_agraph.write_dot(g, "test_graph.dot")
+
     env = simpy.Environment()
     nodes = ersatz.graph.objectify(env, g)
     for name,node in nodes.items():
-        print (name,node.queue,node.outs)
+        print ("Node: %s" % name)
 
-    env.run(until=20)
+    env.run(until=200)
 
 
 if '__main__' == __name__:
