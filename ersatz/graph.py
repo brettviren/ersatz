@@ -24,31 +24,103 @@ All other node attributes passed to the service as keyword arguments on instanti
 import simpy
 import importlib
 import ersatz.node
+import ersatz.factory
+from ersatz.util import get_method
 
-def objectify(env, spec):
+
+def objectify(g, env, factories = ersatz.factory.defaults):
     '''
-    Interpret a spect graph into an object graph.
+    Convert in place some graph node attributes to objects.
+
+    If a node attribute key is in the factories dictionary, run the
+    corresponding factory to produce the object and replace the
+    attribute value with the object.
+
+    Graph attributes provide defaults for all node attributes.  Node
+    attributes are passed to factory.::
+
+        factory(env, key, value, **node_attr) -> object
+    '''
+    defaults = dict(g.graph)
+    for node in g.nodes():
+        attrs = dict(defaults)
+        attrs.update(g.node[node])
+        objs = dict()
+        for key, value in attrs.items():
+            try:
+                fac = factories[key]
+            except KeyError:
+                continue
+            obj = fac(env, key, value, **attrs)
+            #print ("objectify: %s %s %s -> %s" % (node, key, value, obj))
+            objs[key] = obj
+        g.node[node].update(objs)
+
+    return g
 
 
-    Nodes in the spec graph are identified by a name.  The node
-    attribute "service" should be a Python dot.path to a service
-    callable.  Any remaining attributes will be passed to the service.
+def nodify(g, env):
+    '''
+    Return dict keyed by node name of ersatz.node.Node objects
+    configured and connected via given graph using the objects at node
+    attributes `queue` and `service`.
+    '''
+    queues = dict()
+    for node in g.nodes():
+        #print (node, g.node[node])
+        queues[node] = g.node[node]["queue"]
+
+    ret = dict()
+    defaults = dict(g.graph)
+    for node in g.nodes():
+        attrs = dict(defaults)
+        attrs.update(g.node[node])
+
+        service = attrs.pop('service')
+        queue = attrs.pop('queue')
+        #print ("Nodify: %s %s %s" % (node,service,queue))
+
+        outs = {n:queues[n] for n in g.edge[node]}
+        ret[node] = ersatz.node.Node(env, queue, service, outs, **attrs)
+
+    return ret
+
+def _objectify(env, spec):
+    '''
+
+    Interpret the "spec" graph into ersatz.node.Node objects.
+
+    Nodes in the spec graph are identified by a name.
+
+    Node attributes may contain keyword options.  Some are reserved,
+    interpreted and removed.  Any remaining are passed to the service.
+
+        - `queue` :: a Python dotted path to a factory method taking a
+          simpy Environment object and which produces an instance of a
+          queue object.  Default produces a simpy.Store with infinite
+          capacity.  See ersatz.queue for what batteries are included.
+
+        - `service` :: a Python dotted path to a generator as a class
+          or function which provides the service functionality.
+
+    Graph attributes serve as default for node attributes.
     '''
     args = dict()
+    defaults = dict(spec.graph)
     for node in spec.nodes():
-        attrs = spec.node[node]
-        capacity = attrs.pop("capacity", float("inf"))
-        queue = None
-        if capacity > 0:
-            queue = simpy.Store(env, capacity)
-        service = attrs.pop('service')
+        attrs = dict(defaults)
+        attrs.update(spec.node[node])
 
-        if isinstance(service, type("")):
-            modname, methname = service.rsplit('.',1)
-            mod = importlib.import_module(modname)
-            service = getattr(mod, methname)
-            if type(service) == type: # a class
-                service = service(**attrs)
+        queuename = attrs.pop("queue", "ersatz.queue.default")
+        servicename = attrs.pop('service')
+
+        queuefactory = get_method(queuename)
+        queue = queuefactory(env, **attrs)
+
+        service = get_method(servicename)
+        if type(service) == type: # a class
+            service = service(**attrs)
+
         args[node] = (queue, service, attrs)
 
     ret = dict()

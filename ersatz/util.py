@@ -31,7 +31,14 @@ def unitify(thing, **kwds):
         return thing
     return eval(thing, units_dict(), kwds)
 
-def get_method(self, dotpath):
-    modname, methname = dotpath.rsplit('.',1)
+def get_method(dotpath):
+    if not isinstance(dotpath, type("")):
+        return dotpath
+    try:
+        modname, methname = dotpath.rsplit('.',1)
+    except ValueError:
+        print ('dotpath = "%s"' % dotpath)
+        raise
     mod = import_module(modname)
     return getattr(mod, methname)
+

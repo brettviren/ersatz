@@ -28,3 +28,6 @@ README.html
 auto
 *.aux
 *.png
+*.log
+log
+test_*.dot

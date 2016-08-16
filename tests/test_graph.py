@@ -27,7 +27,7 @@ def test_graph():
 
     bandwidth = 1*Gbps
 
-    g.add_node("source", service=generator, number=10, capacity=0, size=100*MB)
+    g.add_node("source", service=generator, number=10, queue="source", size=100*MB)
     g.add_node("tx", service='ersatz.service.tx', fragment_size=10*MB)
     g.add_node("txlink", service='ersatz.service.link', bandwidth=bandwidth)
     g.add_node("switch", service='ersatz.service.switch')
@@ -50,12 +50,14 @@ def test_graph():
     g.add_edge("rx2","sink2")
 
     
+    g.graph["queue"] = "default"
+
     nx.drawing.nx_agraph.write_dot(g, "test_graph.dot")
 
     env = simpy.Environment()
-    nodes = ersatz.graph.objectify(env, g)
-    for name,node in nodes.items():
-        print ("Node: %s" % name)
+    #nodes = ersatz.graph.objectify(env, g)
+    ersatz.graph.objectify(g, env)
+    nodes = ersatz.graph.nodify(g, env)
 
     env.run(until=200)
 
