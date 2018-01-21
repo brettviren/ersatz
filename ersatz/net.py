@@ -140,6 +140,8 @@ def router(env, fromhosts, tohosts, delay=0.0, bandwidth=None):
     for h in fromhosts.values():
         env.process(route(h))
         
+
+
 class Pipe(object):
     """
     A true fixed size store.
@@ -184,10 +186,10 @@ class Pipe(object):
         return p
 
 class Link(object):
-    """A Link represents the one-way propagation through a communication
+    """
+    A Link represents the one-way propagation through a communication
     channel.  Messages put to the link suffer a fixed delay.  No more
     than one message may occupy the link at a time.
-
     """
     def __init__(self, env, delay=0.0, inspector=None):
         self.env = env
@@ -205,7 +207,10 @@ class Link(object):
             self.pipe.put(msg)        
 
     def put(self, msg):
-        self.env.process(self.latency(msg))
+        '''
+        Put a message to the link.  Caller should yield this to make it blocking.  
+        '''
+        return self.env.process(self.latency(msg))
 
     def get(self):
         return self.pipe.get()

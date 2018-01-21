@@ -3,11 +3,11 @@ from ersatz.net import Link, Message
 from ersatz import units
 
 def sender(env, link):
-    """A simple process which randomly generates messages."""
+    "Send messages as fast as link allows"
     for count in range(5):
-        yield env.timeout(units.second)
+        #yield env.timeout(units.second)
         msg = Message(None, None, units.GB, sent=env.now, count=count)
-        link.put(msg)
+        yield link.put(msg)
         print ('sent %d at %f' % (count, msg.sent))
 
 

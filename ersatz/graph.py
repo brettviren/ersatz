@@ -80,7 +80,7 @@ def nodify(g, env):
         queue = attrs.pop('queue')
         #print ("Nodify: %s %s %s" % (node,service,queue))
 
-        outs = {n:queues[n] for n in g.edge[node]}
+        outs = {n:queues[n] for n in g.edges[node]}
         ret[node] = ersatz.node.Node(env, queue, service, outs, **attrs)
 
     return ret
